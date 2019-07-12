@@ -2912,7 +2912,6 @@ func (p *Pipe) SetMaxTime(d time.Duration) *Pipe {
 	return p
 }
 
-
 // Collation allows to specify language-specific rules for string comparison,
 // such as rules for lettercase and accent marks.
 // When specifying collation, the locale field is mandatory; all other collation
@@ -5101,17 +5100,29 @@ func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
 	s.m.RLock()
 	// If there is a slave socket reserved and its use is acceptable, take it as long
 	// as there isn't a master socket which would be preferred by the read preference mode.
-	if s.slaveSocket != nil && s.slaveSocket.dead == nil && s.slaveOk && slaveOk && (s.masterSocket == nil || s.consistency != PrimaryPreferred && s.consistency != Monotonic) {
-		socket := s.slaveSocket
-		socket.Acquire()
-		s.m.RUnlock()
-		return socket, nil
+	if s.slaveSocket != nil {
+		s.slaveSocket.Lock()
+		slaveDead := s.slaveSocket.dead
+		s.slaveSocket.Unlock()
+
+		if slaveDead == nil && s.slaveOk && slaveOk && (s.masterSocket == nil || s.consistency != PrimaryPreferred && s.consistency != Monotonic) {
+			socket := s.slaveSocket
+			socket.Acquire()
+			s.m.RUnlock()
+			return socket, nil
+		}
 	}
-	if s.masterSocket != nil && s.masterSocket.dead == nil {
-		socket := s.masterSocket
-		socket.Acquire()
-		s.m.RUnlock()
-		return socket, nil
+	if s.masterSocket != nil {
+		s.masterSocket.Lock()
+		masterDead := s.masterSocket.dead
+		s.masterSocket.Unlock()
+
+		if masterDead == nil {
+			socket := s.masterSocket
+			socket.Acquire()
+			s.m.RUnlock()
+			return socket, nil
+		}
 	}
 	s.m.RUnlock()
 
@@ -5121,7 +5132,11 @@ func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
 	defer s.m.Unlock()
 
 	if s.slaveSocket != nil && s.slaveOk && slaveOk && (s.masterSocket == nil || s.consistency != PrimaryPreferred && s.consistency != Monotonic) {
-		if s.slaveSocket.dead == nil {
+		s.slaveSocket.Lock()
+		slaveDead := s.slaveSocket.dead
+		s.slaveSocket.Unlock()
+
+		if slaveDead == nil {
 			s.slaveSocket.Acquire()
 			return s.slaveSocket, nil
 		} else {
@@ -5129,7 +5144,11 @@ func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
 		}
 	}
 	if s.masterSocket != nil {
-		if s.masterSocket.dead == nil {
+		s.masterSocket.Lock()
+		masterDead := s.masterSocket.dead
+		s.masterSocket.Unlock()
+
+		if masterDead == nil {
 			s.masterSocket.Acquire()
 			return s.masterSocket, nil
 		} else {
