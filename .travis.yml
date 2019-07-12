@@ -1,6 +1,6 @@
 language: go
 
-go_import_path: github.com/globalsign/mgo
+go_import_path: github.com/ericrpowers/mgo
 
 go:
     - 1.9.x
@@ -33,7 +33,7 @@ install:
 
 before_script:
     - golint  ./... | grep -v 'ID' | cat
-    - go vet github.com/globalsign/mgo/bson github.com/globalsign/mgo/txn github.com/globalsign/mgo 
+    - go vet github.com/ericrpowers/mgo/bson github.com/ericrpowers/mgo/txn github.com/ericrpowers/mgo 
     - export NOIPV6=1
     - make startdb
 
